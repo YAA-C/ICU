@@ -12,6 +12,7 @@ MY_ENV_VAR = os.getenv('MY_ENV_VAR')
 API_KEY: str = os.getenv("API_KEY")
 API_ENDPOINT: str = os.getenv("API_ENDPOINT")
 RCON_ADDRESS: str = os.getenv("RCON_ADDRESS")
+RCON_PORT: str = os.getenv("RCON_PORT")
 RCON_PASSWD: str = os.getenv("RCON_PASSWD")
 GAME_SERVER_DIR: str = os.getenv("GAME_SERVER_DIR")
 db: DataBase = DataBase()
@@ -28,7 +29,7 @@ def sendFile(filePath: str) -> None:
 
 def runLoop():
     try:
-        with Client(RCON_ADDRESS, 5000, passwd=RCON_PASSWD) as client:
+        with Client(RCON_ADDRESS, RCON_PORT, passwd=RCON_PASSWD) as client:
             response = client.run('users')
     except Exception:
         print("Unable to connect to game server.")
