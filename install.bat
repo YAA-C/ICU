@@ -25,7 +25,7 @@ if %errorlevel% neq 0 (
 )
 
 echo compile and build demoparserLib for current system
-maturin develop --release --manifest-path=.\demoparserLib\Cargo.toml
+maturin develop --release --manifest-path=.\parser\demoparserLib\Cargo.toml
 
 call deactivate
 
