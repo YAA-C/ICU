@@ -1,8 +1,10 @@
 import time
 import requests
+import subprocess
+import shutil
+import os
 from rcon.source import Client
 from DataBase import DataBase
-import os
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -27,6 +29,26 @@ def sendFile(filePath: str) -> None:
         req = requests.post(API_ENDPOINT, files={"match.csv": fp}, data={"apikey": API_KEY})
 
 
+def copyFileToParserBucket(fileName: str) -> None:
+    srcPath: str = os.path.join(GAME_SERVER_DIR, "csgo", fileName)
+    destPath: str = os.path.join(os.path.dirname(__file__), "parser", "DemoFiles", "Demos")
+    shutil.copy2(srcPath, destPath)
+
+
+def deleteParserBucketFiles() -> None:
+    pass
+
+
+def parseFile() -> None:
+    baseDir: str = os.path.dirname(__file__)
+    parserDir: str = os.path.join(baseDir, "parser")
+    os.chdir(parserDir)
+    args = ["py", "main.py"]
+    subprocess.run(args)
+    print("DONE")
+    os.chdir(baseDir)
+
+
 def runLoop():
     try:
         with Client(RCON_ADDRESS, RCON_PORT, passwd=RCON_PASSWD) as client:
@@ -35,28 +57,34 @@ def runLoop():
         print("Unable to connect to game server.")
         return
     
-    if not response:
+    if not response:  # game is not stopped
         return
     
     try:
-        filePath: str = getLatestDemoFile()
+        fileName: str = getLatestDemoFile()
     except Exception:
         print("No File Available to send...")
         return
     
-    if db.exists(filePath):
+    if db.exists(fileName):
         print("File already sent...")
         return
 
-    print(f"Sending file: {filePath}")
+    copyFileToParserBucket(fileName)
+
+
+    print("Parsing File...")
+    parseFile(fileName)
+
+    print(f"Sending file: {fileName}")
 
     try:
-        sendFile(filePath)
+        sendFile(fileName)
     except Exception:
-        print(f"Failed to send file {filePath}")
+        print(f"Failed to send file {fileName}")
         return
     
-    db.insert(filePath)
+    db.insert(fileName)
 
 
 def main():
@@ -65,4 +93,5 @@ def main():
         time.sleep(30)
 
 if __name__ == "__main__":
-    main()
+    # main()
+    parseFile()
