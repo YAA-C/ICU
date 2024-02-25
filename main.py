@@ -3,30 +3,44 @@ import requests
 import subprocess
 import shutil
 import os
+from pprint import pprint
 from rcon.source import Client
 from DataBase import DataBase
 from dotenv import load_dotenv
 load_dotenv()
 
-MY_ENV_VAR = os.getenv('MY_ENV_VAR')
-
 
 API_KEY: str = os.getenv("API_KEY")
 API_ENDPOINT: str = os.getenv("API_ENDPOINT")
 RCON_ADDRESS: str = os.getenv("RCON_ADDRESS")
-RCON_PORT: str = os.getenv("RCON_PORT")
+RCON_PORT: int = int(os.getenv("RCON_PORT"))
 RCON_PASSWD: str = os.getenv("RCON_PASSWD")
 GAME_SERVER_DIR: str = os.getenv("GAME_SERVER_DIR")
 db: DataBase = DataBase()
 
 
 def getLatestDemoFile() -> str:
-    pass
+    targetDir: str = os.path.join(GAME_SERVER_DIR, "csgo")
+    files: str = [file for file in os.listdir(targetDir) if file.endswith(".dem")]
+    fileData: list = []
+
+    for file in files:
+        filePath = os.path.join(targetDir, file)
+        modificationTime = os.path.getmtime(filePath)
+        fileData.append((file, modificationTime))
+    
+    fileData = sorted(fileData, key= lambda x: x[1])
+
+    if len(fileData) == 0:
+        raise Exception()
+    return fileData[-1][0]
 
 
-def sendFile(filePath: str) -> None:
+def sendFile(fileName: str) -> None:
+    filePath: str = os.path.join(os.path.dirname(__file__), "parser", "DemoFiles", "csv", fileName)
     with open(filePath, "rb") as fp:
-        req = requests.post(API_ENDPOINT, files={"match.csv": fp}, data={"apikey": API_KEY})
+        req = requests.post(API_ENDPOINT, files={"csvFile": fp}, data={"apikey": API_KEY})
+        print(req.text)
 
 
 def copyFileToParserBucket(fileName: str) -> None:
@@ -35,29 +49,49 @@ def copyFileToParserBucket(fileName: str) -> None:
     shutil.copy2(srcPath, destPath)
 
 
+def deleteAllFilesInFolder(folderPath: str) -> None:
+    for file in os.listdir(folderPath):
+        if not (file.endswith(".dem") ^ file.endswith(".csv")):
+            continue
+
+        filePath = os.path.join(folderPath, file)
+        try:
+            os.remove(filePath)
+            print(f"Deleted: {filePath}")
+        except Exception as e:
+            print(f"Failed to delete {filePath}.\n Exception: {e}")
+
+
 def deleteParserBucketFiles() -> None:
-    pass
+    targetDir1: str = os.path.join(os.path.dirname(__file__), "parser", "DemoFiles", "Demos")
+    targetDir2: str = os.path.join(os.path.dirname(__file__), "parser", "DemoFiles", "csv")
+    deleteAllFilesInFolder(targetDir1)
+    deleteAllFilesInFolder(targetDir2)
 
 
-def parseFile() -> None:
+def parseFile() -> str:
     baseDir: str = os.path.dirname(__file__)
     parserDir: str = os.path.join(baseDir, "parser")
     os.chdir(parserDir)
     args = ["py", "main.py"]
     subprocess.run(args)
-    print("DONE")
     os.chdir(baseDir)
+    allFiles: list[str] = os.listdir(os.path.join(parserDir, "DemoFiles", "csv"))
+    targetFile: str = [file for file in allFiles if file.endswith(".csv")][0]
+    return targetFile
 
 
 def runLoop():
     try:
         with Client(RCON_ADDRESS, RCON_PORT, passwd=RCON_PASSWD) as client:
-            response = client.run('users')
-    except Exception:
+            response: str = client.run('users')
+    except Exception as e:
         print("Unable to connect to game server.")
         return
     
-    if not response:  # game is not stopped
+    userCount: int = int(response[21:23])
+
+    if userCount > 0:
         return
     
     try:
@@ -65,33 +99,38 @@ def runLoop():
     except Exception:
         print("No File Available to send...")
         return
-    
+
     if db.exists(fileName):
         print("File already sent...")
         return
-
+    
+    print(f"Target Acquired: {fileName}")
+    print("Copying file to parser bucket...")    
     copyFileToParserBucket(fileName)
 
-
     print("Parsing File...")
-    parseFile(fileName)
+    parsedFile: str = parseFile()
 
-    print(f"Sending file: {fileName}")
-
+    print(f"Sending file: {parsedFile}...")
     try:
-        sendFile(fileName)
-    except Exception:
-        print(f"Failed to send file {fileName}")
+        sendFile(parsedFile)
+    except Exception as e:
+        print(f"Failed to send file {parsedFile}")
+        print(e)
         return
     
+    print("File Sent Successfully.")
+    print("Performing cleanup...")
+    deleteParserBucketFiles()
     db.insert(fileName)
+    print("Cleanup Done.")
 
 
 def main():
     while True:
-        runLoop(db)
-        time.sleep(30)
+        runLoop()
+        time.sleep(10)
+
 
 if __name__ == "__main__":
-    # main()
-    parseFile()
+    main()
