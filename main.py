@@ -89,9 +89,10 @@ def runLoop():
         print("Unable to connect to game server.")
         return
     
-    userCount: int = int(response[21:23])
+    userCount: int = int(response[-8:-6])
 
     if userCount > 0:
+        print("Match is in progress...")
         return
     
     try:
