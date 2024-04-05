@@ -40,7 +40,12 @@ def sendFile(fileName: str) -> None:
     filePath: str = os.path.join(os.path.dirname(__file__), "parser", "DemoFiles", "csv", fileName)
     with open(filePath, "rb") as fp:
         req = requests.post(API_ENDPOINT, files={"csvFile": fp}, data={"apikey": API_KEY})
-        print(req.text)
+        data = req.json()
+        if data["success"]:
+            print("Uploaded file for analysis successfully!")
+        else:
+            print("Failed uploading data")
+            print(f"Reason {data["message"]}")
 
 
 def copyFileToParserBucket(fileName: str) -> None:
