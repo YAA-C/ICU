@@ -42,7 +42,7 @@ def sendFile(fileName: str) -> None:
     filePath: str = os.path.join(os.path.dirname(__file__), "parser", "DemoFiles", "csv", fileName)
     with open(filePath, "rb") as fp:
         try:
-            req = requests.post("API_ENDPOINT", files={"csvFile": fp}, data={"API_KEY": API_KEY})
+            req = requests.post(API_ENDPOINT, files={"csvFile": fp}, data={"API_KEY": API_KEY})
             # req = requests.post(f"{API_ENDPOINT}/{API_KEY}", files={"csvFile": fp})
             
             if req.status_code == 403:
@@ -169,8 +169,7 @@ def main():
     args = parser.parse_args()
 
     filePath = args.file
-
-    if filePath and os.path.exists(filePath):
+    if filePath and os.path.exists(os.path.join(GAME_SERVER_DIR, "csgo", filePath)):
         try:
             parseAndSend(filePath)
         except Exception:
